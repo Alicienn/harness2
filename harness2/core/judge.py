@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
+from . import runmark
 from .spec import BenchmarkAdapter
 
 
@@ -37,6 +38,7 @@ class Scored:
     label: str
     run_id: str
     chosen_is_base: bool
+    run_fingerprint: str = ""
     n_passed: int | None = None
     n_criteria: int | None = None
     all_pass: bool = False
@@ -58,6 +60,12 @@ def _mode_of(sel: dict) -> str:
     return str(sel.get("mode") if "mode" in sel else sel.get("arm") or "")
 
 
+def _fingerprint_of(sel: dict) -> str:
+    """Identity of the rollout a selection points at; empty when it recorded no directory."""
+    rd = sel.get("chosen_run_dir")
+    return runmark.fingerprint(Path(rd)) if rd else ""
+
+
 def judge_one(
     adapter: BenchmarkAdapter,
     task_id: str,
@@ -70,7 +78,13 @@ def judge_one(
     chosen_is_base: bool = False,
 ) -> Scored:
     s = Scored(
-        task_id=task_id, mode=mode, k=k, label=label, run_id=run_id, chosen_is_base=chosen_is_base
+        task_id=task_id,
+        mode=mode,
+        k=k,
+        label=label,
+        run_id=run_id,
+        chosen_is_base=chosen_is_base,
+        run_fingerprint=runmark.fingerprint(run_dir),
     )
     try:
         got = adapter.score(run_dir, task_id)
@@ -107,6 +121,7 @@ def judge_selections(
                         label=sel.get("chosen_label", ""),
                         run_id=sel.get("chosen_run_id", ""),
                         chosen_is_base=bool(sel.get("chosen_is_base")),
+                        run_fingerprint=_fingerprint_of(sel),
                         error="selection did not complete successfully",
                     )
                 )
@@ -137,6 +152,7 @@ def judge_selections(
                         label=sel.get("chosen_label", ""),
                         run_id=sel.get("chosen_run_id", ""),
                         chosen_is_base=bool(sel.get("chosen_is_base")),
+                        run_fingerprint=_fingerprint_of(sel),
                         error=f"{type(exc).__name__}: {exc}",
                     )
                 )

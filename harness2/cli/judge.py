@@ -63,8 +63,11 @@ def _load_rows(path: Path) -> list[J.Scored]:
 
 
 def _merge(old: list[J.Scored], new: list[J.Scored]) -> list[J.Scored]:
-    """Per (task, mode, k): a changed chosen run replaces; for the same run_id the graded
-    row wins, so a failed re-judge never erases an existing score."""
+    """Per (task, mode, k): a changed chosen run replaces; for the same run_id and the same
+    rollout bytes the graded row wins, so a failed re-judge never erases an existing score.
+    Run ids are fixed labels, so a re-run reuses the id for new output: the fingerprint is
+    what tells the two apart, and a row written before it was recorded is not trusted.
+    """
     by_key = {(r.task_id, r.mode, r.k): r for r in old}
     for r in new:
         key = (r.task_id, r.mode, r.k)
@@ -75,6 +78,8 @@ def _merge(old: list[J.Scored], new: list[J.Scored]) -> list[J.Scored]:
             and prev.graded
             and not r.graded
             and not r.error.startswith("selection")
+            and prev.run_fingerprint
+            and prev.run_fingerprint == r.run_fingerprint
         ):
             continue
         by_key[key] = r
